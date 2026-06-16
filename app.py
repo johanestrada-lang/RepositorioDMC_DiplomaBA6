@@ -26,7 +26,6 @@ def cargar_dataset_local(nombre_archivo):
     """Carga los datasets locales de la carpeta data/ de manera segura."""
     ruta = os.path.join("data", nombre_archivo)
     if os.path.exists(ruta):
-        # Intentar conversión robusta de fechas con errores coercitivos si aplica
         return pd.read_csv(ruta)
     return None
 
@@ -40,7 +39,6 @@ def procesar_y_clasificar_variables(df):
     }
     
     for col in df.columns:
-        # Intento dinámico de conversión a fecha si tiene palabras clave en el nombre
         if 'date' in col.lower() or 'fecha' in col.lower() or df[col].dtype == 'datetime64[ns]':
             try:
                 df[col] = pd.to_datetime(df[col], errors='coerce')
@@ -49,7 +47,6 @@ def procesar_y_clasificar_variables(df):
             except:
                 pass
                 
-        # Clasificación por tipos y cardinalidad
         if pd.api.types.is_numeric_dtype(df[col]):
             if df[col].nunique() == 2:
                 info_columnas['binarias'].append(col)
@@ -111,7 +108,6 @@ elif fuente_datos == "Subir archivo CSV":
         st.session_state['df_analizable'] = df_actual
         st.session_state['nombre_dataset'] = archivo_subido.name
 
-# Validación global de persistencia
 df_trabajo = st.session_state['df_analizable']
 
 # ==========================================
@@ -130,7 +126,7 @@ if opcion_menu == "1. Home":
     
     col1, col2 = st.columns(2)
     with col1:
-        st.info("👤 **Autor:** [Tu Nombre Completo]\n\n📅 **Año:** 2026")
+        st.info("👤 **Autor:** Johan Estrada Alata\n\n📅 **Año:** 2026")
     with col2:
         st.success("🛠️ **Tecnologías:** Python, Streamlit, Pandas, NumPy, Plotly, Matplotlib, Seaborn y GitHub.")
         
@@ -161,11 +157,8 @@ elif opcion_menu == "2. Carga y Perfil":
         st.info("👉 Por favor, selecciona o sube un dataset en el panel izquierdo (Sidebar) para inicializar el perfilamiento.")
     else:
         st.success(f"✅ Analizando activamente: **{st.session_state['nombre_dataset']}**")
-        
-        # Clasificación automática en background
         dict_var = procesar_y_clasificar_variables(df_trabajo)
         
-        # Métricas rápidas
         m1, m2, m3, m4, m5, m6 = st.columns(6)
         m1.metric("Filas Total", f"{df_trabajo.shape[0]:,}")
         m2.metric("Columnas Total", df_trabajo.shape[1])
@@ -177,7 +170,6 @@ elif opcion_menu == "2. Carga y Perfil":
         st.markdown("---")
         st.subheader("👀 Vista Previa y Estructura de Datos")
         
-        # Checkbox para ver datos crudos
         if st.checkbox("Mostrar registros completos (Head)"):
             st.dataframe(df_trabajo.head(10), use_container_width=True)
             
@@ -208,11 +200,8 @@ elif opcion_menu == "3. Procesamiento":
     else:
         st.info(f"Dataset activo en memoria: **{st.session_state['nombre_dataset']}**")
         dict_var = procesar_y_clasificar_variables(df_trabajo)
-        
-        # Clonamos para simular procesamiento limpio
         df_procesado = df_trabajo.copy()
         
-        # 1. Estandarización de columnas
         if st.checkbox("Estandarizar nombres de columnas (Limpieza de espacios/minúsculas)"):
             df_procesado.columns = df_procesado.columns.str.strip().str.replace(' ', '_').str.lower()
             st.success("Columnas estandarizadas temporalmente para análisis.")
@@ -226,7 +215,14 @@ elif opcion_menu == "3. Procesamiento":
             st.markdown("**Valores Nulos por Columna**")
             nulos_series = df_trabajo.isna().sum()
             nulos_df = pd.DataFrame({"Nulos": nulos_series, "Porcentaje (%)": (nulos_series/len(df_trabajo)*100).round(2)})
-            st.dataframe(nulos_df[nulos_df["Nulos"] > 0] if nulos_df["Nulos"].sum() > 0 else "¡Felicidades! No hay valores nulos.", use_container_width=True)
+            
+            # --- SOLUCIÓN AL ERROR 1 ---
+            # Evaluamos de forma segura y separamos la lógica de presentación
+            if nulos_df["Nulos"].sum() > 0:
+                st.dataframe(nulos_df[nulos_df["Nulos"] > 0], use_container_width=True)
+            else:
+                st.success("🎉 ¡Felicidades! No se detectaron valores nulos en este conjunto de datos.")
+            # ---------------------------
             
         with c_p2:
             st.markdown("**Detección de Valores Atípicos (Outliers - Regla IQR)**")
@@ -238,7 +234,11 @@ elif opcion_menu == "3. Procesamiento":
                 limite_inferior = Q1 - 1.5 * IQR
                 limite_superior = Q3 + 1.5 * IQR
                 outliers = df_trabajo[(df_trabajo[var_outlier] < limite_inferior) | (df_trabajo[var_outlier] > limite_superior)]
-                st.warning(f"La variable **{var_outlier}** presenta **{len(outliers)}** registros fuera del rango IQR esperado.")
+                
+                if len(outliers) > 0:
+                    st.warning(f"La variable **{var_outlier}** presenta **{len(outliers)}** registros fuera del rango IQR esperado.")
+                else:
+                    st.success(f"La variable **{var_outlier}** se encuentra balanceada y libre de outliers según la regla IQR.")
             else:
                 st.info("No se detectan variables numéricas continuas disponibles.")
 
@@ -254,17 +254,10 @@ elif opcion_menu == "4. Análisis Visual":
         dict_var = procesar_y_clasificar_variables(df_trabajo)
         nombre_ds = st.session_state['nombre_dataset']
         
-        # Creación de los Tabs solicitados
         t1, t2, t3, t4, t5, t6 = st.tabs([
-            "📊 Resumen", 
-            "📈 Univariado", 
-            "📉 Bivariado", 
-            "🕸️ Multivariado", 
-            "⏱️ Análisis Temporal", 
-            "💡 Insights"
+            "📊 Resumen", "📈 Univariado", "📉 Bivariado", "🕸️ Multivariado", "⏱️ Análisis Temporal", "💡 Insights"
         ])
         
-        # TAB 1: RESUMEN ESTADÍSTICO
         with t1:
             st.subheader("Estadística Descriptiva del Dataset")
             if len(dict_var['numericas']) > 0:
@@ -272,7 +265,6 @@ elif opcion_menu == "4. Análisis Visual":
             else:
                 st.info("Sin variables numéricas directas.")
                 
-        # TAB 2: ANÁLISIS UNIVARIADO
         with t2:
             st.subheader("Distribución de Variables Individuales")
             col_u1, col_u2 = st.columns(2)
@@ -292,25 +284,37 @@ elif opcion_menu == "4. Análisis Visual":
                     st.plotly_chart(fig_u2, use_container_width=True)
                     st.caption(f"Frecuencias volumétricas encontradas para la variable {var_u_cat}.")
 
-        # TAB 3: ANÁLISIS BIVARIADO
         with t3:
             st.subheader("Comparación Cruzada entre Dos Variables")
-            if len(dict_var['numericas']) >= 2:
+            if len(dict_var['numericas']) >= 1:
                 col_b1, col_b2 = st.columns([1, 3])
                 with col_b1:
                     vx = st.selectbox("Eje X (Numérica):", dict_var['numericas'], key="bx")
                     vy = st.selectbox("Eje Y (Numérica):", dict_var['numericas'], key="by")
                     color_b = st.selectbox("Agrupar por Color (Categoría):", ["Ninguno"] + dict_var['categoricas'] + dict_var['binarias'])
+                
                 with col_b2:
-                    color_param = None if color_b == "Ninguno" else color_b
-                    fig_bi = px.scatter(df_trabajo, x=vx, y=vy, color=color_param, title=f"Dispersión: {vx} vs {vy}", trendline="ols" if color_param is None else None)
-                    st.plotly_chart(fig_bi, use_container_width=True)
+                    # --- SOLUCIÓN AL ERROR 2 ---
+                    # Validación de seguridad para prevenir fallos en Narwhals / Plotly
+                    if vx == vy:
+                        st.warning("⚠️ El eje X y el eje Y no pueden ser la misma variable. Selecciona variables diferentes para evaluar la dispersión bivariada.")
+                    else:
+                        color_param = None if color_b == "Ninguno" else color_b
+                        fig_bi = px.scatter(
+                            df_trabajo, 
+                            x=vx, 
+                            y=vy, 
+                            color=color_param, 
+                            title=f"Dispersión: {vx} vs {vy}", 
+                            trendline="ols" if color_param is None else None
+                        )
+                        st.plotly_chart(fig_bi, use_container_width=True)
+                    # ---------------------------
             else:
-                st.warning("Se requieren al menos 2 variables numéricas para análisis cruzado de dispersión.")
+                st.warning("Se requieren variables numéricas cuantitativas para análisis de dispersión.")
 
-        # TAB 4: ANÁLISIS MULTIVARIADO
         with t4:
-            st.subheader("Mapas de Correlación Lineal y Estructuras Complejas")
+            st.subheader("Mapas de Correlación Lineal")
             if len(dict_var['numericas']) >= 2:
                 fig, ax = plt.subplots(figsize=(8, 5))
                 corr_matrix = df_trabajo[dict_var['numericas']].corr()
@@ -320,14 +324,12 @@ elif opcion_menu == "4. Análisis Visual":
             else:
                 st.info("Variables insuficientes para graficar correlaciones complejas.")
 
-        # TAB 5: ANÁLISIS TEMPORAL
         with t5:
             st.subheader("Evolución Cronológica de Métricas")
             if len(dict_var['fechas']) > 0:
                 col_t_sel = st.selectbox("Selecciona la Columna Temporal:", dict_var['fechas'])
                 col_t_num = st.selectbox("Métrica Cuantitativa a Seguir:", dict_var['numericas'], key="t_num")
                 
-                # Resuestreo temporal simple
                 df_temp = df_trabajo.copy()
                 df_temp = df_temp.set_index(pd.to_datetime(df_temp[col_t_sel]))
                 df_resumido = df_temp[col_t_num].resample('ME').mean().reset_index()
@@ -337,11 +339,8 @@ elif opcion_menu == "4. Análisis Visual":
             else:
                 st.warning("⚠️ Este dataset no posee explícitamente variables estructuradas con formato de fecha identificable.")
 
-        # TAB 6: INSIGHTS RECOMENDADOS SEGÚN EL DATASET CARGADO
         with t6:
             st.subheader("💡 Conclusiones Técnicas y Hallazgos Clave")
-            
-            # Lógica inteligente para sugerencias de negocio personalizadas
             if "Jobs" in nombre_ds or "AI_Impact" in nombre_ds:
                 st.markdown("""
                 * **Riesgo por Industria:** Las industrias de servicios técnicos y administrativos muestran un `Automation_Level` superior a la media, incrementando sustancialmente su `AI_Replacement_Risk`.
